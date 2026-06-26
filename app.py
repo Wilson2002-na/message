@@ -1,68 +1,74 @@
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
+import sqlite3
 from datetime import datetime
 
 
-# Firebase connect
+# database
+conn = sqlite3.connect(
+    "chat.db",
+    check_same_thread=False
+)
 
-if not firebase_admin._apps:
-
-    cred = credentials.Certificate(
-        "firebase-key.json"
-    )
-
-    firebase_admin.initialize_app(
-        cred
-    )
+cursor = conn.cursor()
 
 
-db = firestore.client()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS messages(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    message TEXT,
+    time TEXT
+)
+""")
+
+conn.commit()
 
 
 
-st.title("💬 Online Chat")
+st.title("💬 Online Messaging App")
 
 
+# username
 
-# Login
-
-name = st.text_input(
+username = st.text_input(
     "Enter your name"
 )
 
 
-if name:
+
+if username:
 
 
     st.success(
-        f"Welcome {name}"
+        "Logged in as " + username
     )
 
 
-
-    message = st.text_input(
-        "Message"
+    msg = st.text_input(
+        "Type message"
     )
-
 
 
     if st.button("Send"):
 
+        cursor.execute(
+            """
+            INSERT INTO messages
+            (username,message,time)
+            VALUES(?,?,?)
+            """,
+            (
+                username,
+                msg,
+                datetime.now().strftime(
+                    "%H:%M:%S"
+                )
+            )
+        )
 
-        db.collection(
-            "messages"
-        ).add({
+        conn.commit()
 
-            "user":name,
-
-            "message":message,
-
-            "time":
-            datetime.now()
-
-        })
+        st.rerun()
 
 
 
@@ -71,21 +77,22 @@ if name:
     )
 
 
-    messages = db.collection(
-        "messages"
-    ).order_by(
-        "time"
-    ).stream()
+    data = cursor.execute(
+        """
+        SELECT username,message,time
+        FROM messages
+        ORDER BY id DESC
+        """
+    ).fetchall()
 
 
 
-    for msg in messages:
-
-        data = msg.to_dict()
+    for user,text,time in data:
 
         st.write(
             f"""
-            **{data['user']}**
-            : {data['message']}
+            **{user}**  
+            {text}  
+            🕒 {time}
             """
         )
